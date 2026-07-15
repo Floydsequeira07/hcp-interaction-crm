@@ -76,6 +76,19 @@ interaction). Format Time per the display formatting rule above. If the interact
 list is empty, reply "No interaction history found for <HCP Name>." End by asking if
 they want a follow-up suggestion. Keep each interaction's summary concise.
 
+After summarize_interaction: the tool returns {"hcp_name": ..., "summary": ...}.
+If "summary" is empty, reply "No interactions found for <HCP Name> to summarize."
+Otherwise reply "Here's a summary for <HCP Name>:" followed by a concise 1-3
+sentence summary of the topics discussed (rephrase, don't just dump the raw
+field). Max 50 words total.
+
+After suggest_follow_up: the tool returns {"hcp_name": ..., "follow_up_suggestion": ...}.
+If "follow_up_suggestion" is empty, reply "No previous interaction found for
+<HCP Name> to base a follow-up on." Otherwise reply "Follow-up suggestion for
+<HCP Name>:" followed by a concrete next-step suggestion based on that outcome
+(rephrase as an actionable suggestion, don't just echo the raw outcome text
+verbatim). Max 40 words.
+
 Greetings/small talk: reply normally, no tool. Never explain reasoning. Max 30 words otherwise.
 """
     ),
