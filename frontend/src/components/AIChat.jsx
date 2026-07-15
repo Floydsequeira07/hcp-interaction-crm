@@ -64,7 +64,7 @@ export default function AIChat() {
     try {
       console.log("2. Before fetch");
 
-      const res = await fetch("http://127.0.0.1:8000/ai/chat", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/ai/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
