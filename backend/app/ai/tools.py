@@ -1,4 +1,5 @@
 from langchain_core.tools import tool
+from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 from typing import Optional
 import json
@@ -63,7 +64,7 @@ def resolve_relative_date(date_str: str):
         return None
 
     s = date_str.strip().lower()
-    today = datetime.now().date()
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
 
     if s == "today":
         return today
@@ -122,7 +123,7 @@ def log_interaction(interaction: str):
     db = SessionLocal()
 
     try:
-        now = datetime.now()
+        now = datetime.now(ZoneInfo("Asia/Kolkata"))
         today_str = now.strftime("%Y-%m-%d")
 
         prompt = f"""
@@ -233,7 +234,7 @@ def edit_interaction(correction: str):
         if not last:
             return json.dumps({"error": "No interaction found to edit."})
 
-        now = datetime.now()
+        now = datetime.now(ZoneInfo("Asia/Kolkata"))
         today_str = now.strftime("%Y-%m-%d")
 
         prompt = f"""
