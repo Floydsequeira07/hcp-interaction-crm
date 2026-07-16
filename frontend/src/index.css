@@ -341,6 +341,22 @@ select{
   cursor:pointer;
 }
 
+.hcpform-sentiment-option:hover{
+  background:none;
+  box-shadow:none;
+}
+
+.hcpform-sentiment-option input[type="radio"]{
+  outline:none;
+  box-shadow:none;
+}
+
+.hcpform-sentiment-option input[type="radio"]:focus,
+.hcpform-sentiment-option input[type="radio"]:hover{
+  outline:none;
+  box-shadow:none;
+}
+
 .hcpform-footer{
   display:flex;
   gap:12px;
@@ -380,4 +396,118 @@ select{
 
 .hcpform-save-btn:hover{
   background:#1d4ed8;
+}
+
+/* ===== Responsive breakpoints ===== */
+/* Everything above is untouched — these only kick in on smaller screens. */
+
+@media (max-width: 1024px) {
+  .hcpform-wrapper{
+    max-width:100%;
+    padding:24px 20px;
+  }
+
+  .aichat-header,
+  .aichat-messages,
+  .aichat-input-area{
+    padding-left:18px;
+    padding-right:18px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Form fields go from 2 columns to 1, so nothing gets cramped */
+  .hcpform-grid{
+    grid-template-columns:1fr;
+    gap:16px;
+  }
+
+  .hcpform-wrapper{
+    padding:20px 16px;
+  }
+
+  .hcpform-title{
+    font-size:20px;
+    margin-bottom:18px;
+  }
+
+  .hcpform-block{
+    margin-top:22px;
+  }
+
+  .hcpform-sentiment-row{
+    gap:18px;
+    flex-wrap:wrap;
+  }
+
+  .hcpform-footer{
+    flex-direction:column;
+  }
+
+  .hcpform-save-btn,
+  .hcpform-clear-btn{
+    justify-content:center;
+    width:100%;
+  }
+
+  .aichat-header,
+  .aichat-messages,
+  .aichat-input-area{
+    padding-left:16px;
+    padding-right:16px;
+  }
+
+  .aichat-messages{
+    padding-top:24px;
+  }
+
+  .aichat-bubble-user,
+  .aichat-bubble-success,
+  .aichat-bubble-default{
+    max-width:92%;
+  }
+
+  .aichat-try-row span{
+    font-size:11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hcpform-wrapper{
+    padding:16px 12px;
+  }
+
+  .hcpform-title{
+    font-size:18px;
+  }
+
+  .hcpform-materials-card{
+    padding:14px;
+  }
+
+  .aichat-header{
+    padding:16px 14px;
+  }
+
+  .aichat-title{
+    font-size:15px;
+  }
+
+  .aichat-messages,
+  .aichat-input-area{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .aichat-input-row{
+    gap:8px;
+  }
+
+  .aichat-send-button{
+    width:48px;
+  }
+
+  .aichat-try-row{
+    display:none; /* saves vertical space on small phones */
+  }
 }
