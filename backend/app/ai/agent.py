@@ -6,18 +6,20 @@ from pydantic import BaseModel, Field
 from typing import Literal
 
 from app.ai.graph import graph
-from app.ai.tools import edit_interaction
+from app.ai.tools import edit_interaction, log_interaction
 from app.ai.llm import llm
 
 
 class MessageIntent(BaseModel):
     """
     Classifies whether the user's message describes a brand new HCP
-    interaction happening, or is a correction/edit to something already
-    logged (even a short one like a single field, or one with no name at
-    all like "it was a phone call, not a visit").
+    interaction happening, is a correction/edit to something already logged,
+    or is neither (greeting, small talk, thanks, general question, history/
+    summary/follow-up request, etc.) — the "other" category exists
+    specifically so those messages are NOT forced into correction just
+    because they don't describe a new interaction either.
     """
-    intent: Literal["new_interaction", "correction"] = Field(
+    intent: Literal["new_interaction", "correction", "other"] = Field(
         description=(
             "new_interaction: the message describes a fresh visit, call, "
             "meeting, or conference that just happened, with enough detail "
@@ -25,9 +27,14 @@ class MessageIntent(BaseModel):
             "correction: the message is fixing, clarifying, or changing "
             "something about an interaction that was already logged — "
             "even if it names a doctor, even if it's very short, even if "
-            "it doesn't use words like 'sorry' or 'actually', and almost "
-            "always when no HCP name is mentioned at all. When in doubt "
-            "between the two, prefer correction."
+            "it doesn't use words like 'sorry' or 'actually'. "
+            "other: greetings ('hi', 'hello', 'good evening', 'thanks'), "
+            "small talk, general questions, or requests to view "
+            "history/summary/follow-up suggestions. Do NOT default a plain "
+            "greeting or small talk to correction just because it has no "
+            "HCP name and doesn't describe a new event — only choose "
+            "correction if the message is actually amending existing data "
+            "(a time, date, sentiment, name, etc. being fixed or changed)."
         )
     )
 
@@ -46,17 +53,17 @@ what happened? If yes, it's new_interaction — even if the tone is casual, even
 if it includes the HCP's reaction or a follow-up detail. A new_interaction
 message is a small STORY: who, what happened, what came of it.
 
-Strong signal: if the message does NOT name an HCP, it is almost always a
-correction — even if it describes a time, date, place, or event-sounding
-detail. Reps only omit the name when they're amending something already on
-record, since a brand-new interaction can't be logged without knowing who it
-was with.
+If the message does NOT name an HCP AND is actually amending/fixing a
+previously logged detail (a time, date, sentiment, name, outcome, etc. being
+corrected), it's correction — reps omit the name when they're clearly
+continuing a correction to something already on record.
 
-A correction message does NOT describe a new event happening — it's a short
-fix, clarification, or amendment to something already logged. It typically
-either has no action verb at all, or explicitly contradicts/replaces a detail
-("not X, it was Y", "make it X instead", "her name is spelled X"), OR it
-omits an HCP name entirely.
+If the message is a greeting, small talk, thanks, a general question, or a
+request to view history/summarize/get a follow-up suggestion, it is "other"
+— NEVER correction. A short casual message with no correction content and no
+new-event content (e.g. "hello", "good evening", "thanks", "how's it going")
+is ALWAYS other. Do not default to correction just because it's short or has
+no HCP name — "other" exists exactly for this case.
 
 Examples of new_interaction (has an action verb + NAMED HCP + what happened):
 - "Visited Dr. Sharma today, discussed Product X, positive feedback"
@@ -64,7 +71,7 @@ Examples of new_interaction (has an action verb + NAMED HCP + what happened):
 - "Had a quick call with Dr. Verma about the trial results, she wants more data before committing"
 - "Stopped by Dr. Nair's clinic this morning, walked her through the new dosing chart"
 
-Examples of correction (no new action described, or no HCP named, just a fix to existing data):
+Examples of correction (no new action described, or no HCP named, but IS fixing existing data):
 - "it was a phone call, not a visit"
 - "the name is Dr. Smith"
 - "make the sentiment neutral"
@@ -74,10 +81,21 @@ Examples of correction (no new action described, or no HCP named, just a fix to 
 - "It was closer to 4pm"
 - "That actually happened on the 10th"
 
+Examples of other (neither correction nor new interaction — NOT amending anything):
+- "hello"
+- "good evening"
+- "hi there"
+- "thanks!"
+- "how's it going"
+- "show me Dr. Rao's history"
+- "summarize my visits with Dr. Nair"
+- "any follow-up suggestions for Dr. Verma?"
+
 If the message names a doctor AND describes an action/event with that doctor,
 always choose new_interaction, regardless of casual tone or included reactions.
-If the message does NOT name a doctor, choose correction, even if it mentions
-a time, date, or something that "happened."
+If the message does NOT name a doctor, ask: is it actually correcting/fixing a
+detail? If yes -> correction. If it's just a greeting/small talk/question with
+nothing to fix -> other.
 """
     result = intent_classifier.invoke(prompt)
     return result.intent
@@ -86,7 +104,7 @@ a time, date, or something that "happened."
 def _format_display_value(field: str, value):
     """Format a field's value for display in chat text only.
     Does not mutate the underlying stored value in `changes`."""
-    if value == "":
+    if value == "" or value is None:
         return "(none)"
     if field == "time" and isinstance(value, str):
         for fmt in ("%H:%M:%S", "%H:%M"):
@@ -117,6 +135,37 @@ def _format_edit_response(changes: dict) -> str:
     return "✅ Interaction updated! " + ", ".join(parts) + "."
 
 
+def _format_log_response(data: dict) -> str:
+    """Builds the '✅ Interaction logged successfully!' summary in Python,
+    instead of relying on the agent's own text generation, since that part
+    doesn't need an LLM call at all — the tool already returned everything
+    needed."""
+    label_map = [
+        ("hcp_name", "HCP Name"),
+        ("interaction_type", "Interaction Type"),
+        ("date", "Date"),
+        ("time", "Time"),
+        ("attendees", "Attendees"),
+        ("sentiment", "Sentiment"),
+        ("materials_shared", "Materials Shared"),
+        ("samples_distributed", "Samples Distributed"),
+        ("outcomes", "Outcome"),
+    ]
+
+    parts = []
+    for field, label in label_map:
+        value = data.get(field)
+        if value in (None, ""):
+            continue
+        display_value = _format_display_value(field, value)
+        if field == "sentiment" and isinstance(display_value, str):
+            display_value = display_value.capitalize()
+        parts.append(f"{label}: {display_value}")
+
+    summary = ", ".join(parts)
+    return f"✅ Interaction logged successfully! {summary}. Would you like a follow-up suggestion?"
+
+
 def _invoke_with_retry(message: str, retries: int = 3):
     last_error = None
     for attempt in range(retries + 1):
@@ -142,6 +191,12 @@ def chat_with_agent(message: str):
     intent = _classify_intent(message)
     print("Classified intent:", intent)
 
+    # Both correction and new_interaction bypass the agent's own tool-calling
+    # entirely and call the tool directly in code. Groq's function-calling
+    # wire format has repeatedly produced malformed output for both of these
+    # (especially at temperature=0, where a bad generation repeats
+    # identically on every retry) — calling the tool directly removes that
+    # unreliable layer completely for the two most important actions.
     if intent == "correction":
         print("-> calling edit_interaction directly")
         try:
@@ -154,6 +209,21 @@ def chat_with_agent(message: str):
         ai_text = _format_edit_response(changes)
         return {**changes, "ai_response": ai_text}
 
+    if intent == "new_interaction":
+        print("-> calling log_interaction directly")
+        try:
+            raw_result = log_interaction.invoke({"interaction": message})
+            data = json.loads(raw_result)
+        except Exception as e:
+            print("DIRECT LOG ERROR:", str(e))
+            return {"ai_response": "Sorry, I couldn't process that interaction."}
+
+        ai_text = _format_log_response(data)
+        return {**data, "ai_response": ai_text}
+
+    # "other" (greetings, small talk, history/summary/follow-up requests)
+    # still goes through the full agent, since it genuinely needs to choose
+    # between multiple tools (or no tool at all) and write a natural reply.
     try:
         response = _invoke_with_retry(message)
     except Exception as e:

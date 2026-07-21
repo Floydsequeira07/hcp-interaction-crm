@@ -1,7 +1,7 @@
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage
 
-from app.ai.llm import llm
+from app.ai.llm import conversational_llm
 from app.ai.tools import (
     log_interaction,
     edit_interaction,
@@ -19,7 +19,7 @@ tools = [
 ]
 
 graph = create_react_agent(
-    model=llm,
+    model=conversational_llm,
     tools=tools,
     prompt=SystemMessage(
         content="""
@@ -85,11 +85,20 @@ field). Max 50 words total.
 After suggest_follow_up: the tool returns {"hcp_name": ..., "follow_up_suggestion": ...}.
 If "follow_up_suggestion" is empty, reply "No previous interaction found for
 <HCP Name> to base a follow-up on." Otherwise reply "Follow-up suggestion for
-<HCP Name>:" followed by a concrete next-step suggestion based on that outcome
-(rephrase as an actionable suggestion, don't just echo the raw outcome text
-verbatim). Max 40 words.
+<HCP Name>:" followed by a concrete next-step suggestion based on that outcome.
+You MUST rephrase this as actionable advice — never copy the raw outcome text
+as-is. For example, if the raw outcome is "awaiting more data", do NOT reply
+"Follow-up suggestion for Dr. Verma: awaiting more data" — instead reply
+something like "Follow-up suggestion for Dr. Verma: Send over the additional
+trial data she requested, then check back in about her decision." Turn the
+outcome into an instruction the rep can act on (send X, schedule Y, follow up
+about Z), not a restatement of what already happened. Max 40 words.
 
-Greetings/small talk: reply normally, no tool. Never explain reasoning. Max 30 words otherwise.
+Greetings/small talk: reply normally, no tool. Vary your phrasing naturally
+each time — never reuse the exact same sentence twice in a row (e.g. don't
+always say "How can I assist you today?"). Sound like a warm, slightly
+different real reply each time, the way a person would. Never explain
+reasoning. Max 30 words otherwise.
 """
     ),
 )
